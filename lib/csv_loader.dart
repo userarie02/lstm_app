@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:convert';
 import 'package:intl/intl.dart';
@@ -32,7 +33,7 @@ class CSVLoader {
   // BOTH FORMAT
   DateTime parseFlexibleDate(String input) {
     try {
-      return DateFormat("M/d/yyyy H:mm").parseStrict(input);
+      return DateFormat("d/M/yyyy H:mm").parseStrict(input);
     } catch (_) {
       return DateFormat("yyyy-MM-dd HH:mm:ss").parseStrict(input);
     }
@@ -54,7 +55,9 @@ class CSVLoader {
   }
 
   Future<List<SensorReading>> loadAndPrepareBuffer() async {
-    final rawData = await rootBundle.loadString('assets/sensor_readings.csv');
+    final rawData = await rootBundle.loadString(
+      'assets/sensor_readings_120.csv',
+    );
     final lines = const LineSplitter().convert(rawData).skip(1); // skip header
 
     for (final line in lines) {
@@ -86,30 +89,52 @@ class CSVLoader {
   }
 
   List<List<double>> preprocessBuffer(List<SensorReading> buffer) {
-    return buffer.map((reading) {
-      final hour = reading.date.hour / 23.0;
-      final dayOfWeek = reading.date.weekday % 7 / 6.0;
-      final month = reading.date.month / 12.0;
+    final preprocessed =
+        buffer.map((reading) {
+          final hour = reading.date.hour / 23.0;
+          final dayOfWeek = reading.date.weekday % 7 / 6.0;
+          final month = reading.date.month / 12.0;
 
-      return [
-        normalize(reading.humidity, min['Humidity']!, max['Humidity']!),
-        normalize(
-          reading.temperature,
-          min['Temperature']!,
-          max['Temperature']!,
-        ),
-        normalize(reading.voc, min['VOC']!, max['VOC']!),
-        normalize(reading.pm25, min['PM2.5']!, max['PM2.5']!),
-        normalize(reading.pm10, min['PM10']!, max['PM10']!),
-        hour,
-        dayOfWeek,
-        month,
-      ];
-    }).toList();
+          return [
+            safeNormalize(reading.humidity, min['Humidity']!, max['Humidity']!),
+            safeNormalize(
+              reading.temperature,
+              min['Temperature']!,
+              max['Temperature']!,
+            ),
+            safeNormalize(reading.voc, min['VOC']!, max['VOC']!),
+            safeNormalize(reading.pm25, min['PM2.5']!, max['PM2.5']!),
+            safeNormalize(reading.pm10, min['PM10']!, max['PM10']!),
+            hour,
+            dayOfWeek,
+            month,
+          ];
+        }).toList();
+
+    // DEBUG IN PREPROCESS BUFFER CSV DART
+    if (preprocessed.isNotEmpty) {
+      if (kDebugMode) {
+        print("📊 Sample normalized row: ${preprocessed.last}");
+      }
+      if (kDebugMode) {
+        print(
+          "🧪 Input shape: ${preprocessed.length} x ${preprocessed[0].length}",
+        );
+      }
+      if (kDebugMode) {
+        print("✅ Normalization MIN values: $min");
+      }
+      if (kDebugMode) {
+        print("✅ Normalization MAX values: $max");
+      }
+    }
+
+    return preprocessed;
   }
 
-  double normalize(double value, double min, double max) {
-    return (value - min) / (max - min);
+  double safeNormalize(double value, double min, double max) {
+    final clamped = value.clamp(min, max);
+    return (clamped - min) / (max - min);
   }
 
   Future<List<SensorReading>> loadFullBuffer() async {
