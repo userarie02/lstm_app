@@ -5,7 +5,7 @@ class MLPredictor {
   late Interpreter _interpreter;
 
   Future<void> loadModel() async {
-    _interpreter = await Interpreter.fromAsset('assets/lstm_model.tflite');
+    _interpreter = await Interpreter.fromAsset('assets/lstm_model_day.tflite');
   }
 
   Future<List<double>> predict(List<List<double>> preprocessedInput) async {
@@ -20,7 +20,7 @@ class MLPredictor {
     // Run inference (input shape: [1, 60, 8])
     _interpreter.runForMultipleInputs(
       [
-        flatInput.reshape([1, 60, 8]),
+        flatInput.reshape([1, 12, 8]),
       ],
       {0: outputCurrent, 1: outputFuture},
     );

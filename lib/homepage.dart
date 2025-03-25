@@ -16,11 +16,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    const HomeMainContent(), // Original home content
-    Container(),
-    SettingsPagePlaceholder(), // Placeholder settings
-  ];
+  String tempValue = '...';
+  String humidValue = '...';
+  String timeValue = '...';
+  String dateValue = '...';
+  String pm25Value = '...';
+  String pm10Value = '...';
+  String vocValue = '...';
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +37,24 @@ class _HomePageState extends State<HomePage> {
           );
         },
 
-        child: _pages[_currentIndex],
+        child:
+            [
+              HomeMainContent(
+                onDataUpdate: (newData) {
+                  setState(() {
+                    tempValue = newData['temp'] ?? '...';
+                    humidValue = newData['humid'] ?? '...';
+                    timeValue = newData['time'] ?? '...';
+                    dateValue = newData['date'] ?? '...';
+                    pm25Value = newData['pm25'] ?? '...';
+                    pm10Value = newData['pm10'] ?? '...';
+                    vocValue = newData['voc'] ?? '...';
+                  });
+                },
+              ),
+              Container(),
+              const SettingsPagePlaceholder(),
+            ][_currentIndex],
       ),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.only(left: 16, right: 16, bottom: 29),
@@ -63,7 +82,51 @@ class _HomePageState extends State<HomePage> {
 
               child: BottomNavigationBar(
                 currentIndex: _currentIndex,
-                onTap: (index) => setState(() => _currentIndex = index),
+                //TAP
+                onTap: (index) {
+                  if (index == 1) {
+                    // Just copy the SEE ALL logic here
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        transitionDuration: const Duration(milliseconds: 400),
+                        pageBuilder:
+                            (context, animation, secondaryAnimation) =>
+                                AllDataPage(
+                                  temp: tempValue,
+                                  humid: humidValue,
+                                  pm25: pm25Value,
+                                  pm10: pm10Value,
+                                  voc: vocValue,
+                                  time: timeValue,
+                                  date: dateValue,
+                                ),
+                        transitionsBuilder: (
+                          context,
+                          animation,
+                          secondaryAnimation,
+                          child,
+                        ) {
+                          final offsetAnimation = Tween<Offset>(
+                            begin: const Offset(1.0, 0.0),
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          );
+                          return SlideTransition(
+                            position: offsetAnimation,
+                            child: child,
+                          );
+                        },
+                      ),
+                    );
+                  } else {
+                    setState(() => _currentIndex = index);
+                  }
+                },
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 type: BottomNavigationBarType.fixed,
@@ -128,7 +191,9 @@ Widget _buildSelectedIcon(IconData icon) {
 }
 
 class HomeMainContent extends StatefulWidget {
-  const HomeMainContent({super.key});
+  final void Function(Map<String, String>) onDataUpdate;
+
+  const HomeMainContent({super.key, required this.onDataUpdate});
 
   @override
   State<HomeMainContent> createState() => _HomeMainContentState();
@@ -164,126 +229,117 @@ class _HomeMainContentState extends State<HomeMainContent> {
       await csvLoader.loadScalerConfig(); // SCALER
 
       final buffer = await csvLoader.loadAndPrepareBuffer();
-      final preprocessed = csvLoader.preprocessBuffer(buffer);
 
-      if (preprocessed.length == 60) {
-        final prediction = await mlPredictor.predict(preprocessed);
+      if (buffer.length >= 12) {
+        final last12 = buffer.sublist(buffer.length - 12);
+        final preprocessed = csvLoader.preprocessBuffer(last12);
 
-        final minTemp = csvLoader.min['Temperature']!;
-        final maxTemp = csvLoader.max['Temperature']!;
-        final minHumid = csvLoader.min['Humidity']!;
-        final maxHumid = csvLoader.max['Humidity']!;
-        final minVOC = csvLoader.min['VOC']!;
-        final maxVOC = csvLoader.max['VOC']!;
-        final minPM25 = csvLoader.min['PM2.5']!;
-        final maxPM25 = csvLoader.max['PM2.5']!;
-        final minPM10 = csvLoader.min['PM10']!;
-        final maxPM10 = csvLoader.max['PM10']!;
+        if (preprocessed.length == 12) {
+          final prediction = await mlPredictor.predict(preprocessed);
 
-        final predictedHumidity =
-            prediction[0] * (maxHumid - minHumid) + minHumid;
-        final predictedTemp = prediction[1] * (maxTemp - minTemp) + minTemp;
-        final predictedVOC = prediction[2] * (maxVOC - minVOC) + minVOC;
-        final predictedPM25 = prediction[3] * (maxPM25 - minPM25) + minPM25;
-        final predictedPM10 = prediction[4] * (maxPM10 - minPM10) + minPM10;
+          final minTemp = csvLoader.min['Temperature']!;
+          final maxTemp = csvLoader.max['Temperature']!;
+          final minHumid = csvLoader.min['Humidity']!;
+          final maxHumid = csvLoader.max['Humidity']!;
+          final minVOC = csvLoader.min['VOC']!;
+          final maxVOC = csvLoader.max['VOC']!;
+          final minPM25 = csvLoader.min['PM2.5']!;
+          final maxPM25 = csvLoader.max['PM2.5']!;
+          final minPM10 = csvLoader.min['PM10']!;
+          final maxPM10 = csvLoader.max['PM10']!;
 
-        final latestDate = buffer.last.date;
+          final predictedHumidity =
+              prediction[0] * (maxHumid - minHumid) + minHumid;
+          final predictedTemp = prediction[1] * (maxTemp - minTemp) + minTemp;
+          final predictedVOC = prediction[2] * (maxVOC - minVOC) + minVOC;
+          final predictedPM25 = prediction[3] * (maxPM25 - minPM25) + minPM25;
+          final predictedPM10 = prediction[4] * (maxPM10 - minPM10) + minPM10;
 
-        // LAST UPDATED DATE LOGIC
-        final formattedTime = DateFormat.jm().format(latestDate);
-        final formattedDate = DateFormat(
-          'd MMM yyyy',
-        ).format(latestDate); // 5 Aug 2025
+          final latestDate = buffer.last.date;
 
-        // STATUS LOGIC
-        String newStatus;
-        Color newStatusColor;
+          // LAST UPDATED DATE LOGIC
+          final formattedTime = DateFormat.jm().format(latestDate);
+          final formattedDate = DateFormat(
+            'd MMM yyyy',
+          ).format(latestDate); // 5 Aug 2025
 
-        // ACTUAL SENSOR VALUES FROM CSV
-        final actualTemp = buffer.last.temperature;
-        final actualHumidity = buffer.last.humidity;
-        final actualVOC = buffer.last.voc;
-        final actualPM25 = buffer.last.pm25;
-        final actualPM10 = buffer.last.pm10;
+          // STATUS LOGIC
+          String newStatus;
+          Color newStatusColor;
 
-        // FUNCTION TO CHECK IF VALUES ARE CLOSE ENOUGH
-        bool isCloseEnough(
-          double predicted,
-          double actual,
-          double tolerancePercent,
-        ) {
-          final diff = (predicted - actual).abs();
-          final threshold = (tolerancePercent / 100) * actual;
-          return diff <= threshold;
-        }
+          final actualTemp =
+              buffer.last.temperature * (maxTemp - minTemp) + minTemp;
+          final actualHumidity =
+              buffer.last.humidity * (maxHumid - minHumid) + minHumid;
+          final actualVOC = buffer.last.voc * (maxVOC - minVOC) + minVOC;
+          final actualPM25 = buffer.last.pm25 * (maxPM25 - minPM25) + minPM25;
+          final actualPM10 = buffer.last.pm10 * (maxPM10 - minPM10) + minPM10;
 
-        // COMPARISON RESULTS
-        final isTempClose = isCloseEnough(predictedTemp, actualTemp, 10);
-        final isHumidityClose = isCloseEnough(
-          predictedHumidity,
-          actualHumidity,
-          10,
-        );
-        final isVOCClose = isCloseEnough(predictedVOC, actualVOC, 10);
-        final isPM25Close = isCloseEnough(predictedPM25, actualPM25, 10);
-        final isPM10Close = isCloseEnough(predictedPM10, actualPM10, 10);
+          // FUNCTION TO CHECK IF VALUES ARE CLOSE ENOUGH
+          bool isCloseEnough(
+            double predicted,
+            double actual,
+            double tolerancePercent,
+          ) {
+            final diff = (predicted - actual).abs();
+            final threshold = (tolerancePercent / 100) * actual;
+            return diff <= threshold;
+          }
 
-        // COUNT HOW MANY FEATURES MATCH
-        final closeCount =
-            [
-              isTempClose,
-              isHumidityClose,
-              isVOCClose,
-              isPM25Close,
-              isPM10Close,
-            ].where((match) => match).length;
+          // COMPARISON RESULTS
+          final isTempClose = isCloseEnough(predictedTemp, actualTemp, 10);
+          final isHumidityClose = isCloseEnough(
+            predictedHumidity,
+            actualHumidity,
+            10,
+          );
+          final isVOCClose = isCloseEnough(predictedVOC, actualVOC, 10);
+          final isPM25Close = isCloseEnough(predictedPM25, actualPM25, 10);
+          final isPM10Close = isCloseEnough(predictedPM10, actualPM10, 10);
 
-        if (closeCount >= 3) {
-          newStatus = 'High Risk';
-          newStatusColor = Colors.red;
-          statusIcon = Icons.warning_amber_rounded;
-        } else {
-          newStatus = 'False Alarm';
-          newStatusColor = const Color(0xFF137547);
-          statusIcon = Icons.check_circle_outline;
-        }
+          // COUNT HOW MANY FEATURES MATCH
+          final closeCount =
+              [
+                isTempClose,
+                isHumidityClose,
+                isVOCClose,
+                isPM25Close,
+                isPM10Close,
+              ].where((match) => match).length;
 
-        if (kDebugMode) {
-          print('✅ Corrected Prediction vs Actual:');
-        }
-        if (kDebugMode) {
-          print('Temperature: $predictedTemp vs ${buffer.last.temperature}');
-        }
-        if (kDebugMode) {
-          print('Humidity: $predictedHumidity vs ${buffer.last.humidity}');
-        }
-        if (kDebugMode) {
-          print('VOC: $predictedVOC vs ${buffer.last.voc}');
-        }
-        if (kDebugMode) {
-          print('PM2.5: $predictedPM25 vs ${buffer.last.pm25}');
-        }
-        if (kDebugMode) {
-          print('PM10: $predictedPM10 vs ${buffer.last.pm10}');
-        }
+          if (closeCount >= 3) {
+            newStatus = 'High Risk';
+            newStatusColor = Colors.red;
+            statusIcon = Icons.warning_amber_rounded;
+          } else {
+            newStatus = 'False Alarm';
+            newStatusColor = const Color(0xFF137547);
+            statusIcon = Icons.check_circle_outline;
+          }
 
-        setState(() {
-          tempValue = '${predictedTemp.toStringAsFixed(1)}°C';
-          humidValue = '${predictedHumidity.toStringAsFixed(1)}%';
-          timeValue = DateFormat.jm().format(latestDate);
-          dateValue = DateFormat.yMd().format(latestDate);
-          statusText = newStatus;
-          lastUpdatedText = 'Last Updated $formattedTime, $formattedDate';
-          statusColor = newStatusColor;
-          statusIcon = statusIcon;
+          if (kDebugMode) {
+            print('✅ Corrected Prediction vs Actual:');
+            print('Temperature: $predictedTemp vs $actualTemp');
+            print('Humidity: $predictedHumidity vs $actualHumidity');
+            print('VOC: $predictedVOC vs $actualVOC');
+            print('PM2.5: $predictedPM25 vs $actualPM25');
+            print('PM10: $predictedPM10 vs $actualPM10');
+          }
 
-          pm25Value = '${predictedPM25.toStringAsFixed(1)} µg/m³';
-          pm10Value = '${predictedPM10.toStringAsFixed(1)} µg/m³';
-          vocValue = '${predictedVOC.toStringAsFixed(1)} ppm';
-        });
-      } else {
-        if (kDebugMode) {
-          print('Not enough readings for prediction.');
+          setState(() {
+            tempValue = '${predictedTemp.toStringAsFixed(1)}°C';
+            humidValue = '${predictedHumidity.toStringAsFixed(1)}%';
+            timeValue = DateFormat.jm().format(latestDate);
+            dateValue = DateFormat.yMd().format(latestDate);
+            statusText = newStatus;
+            lastUpdatedText = 'Last Updated $formattedTime, $formattedDate';
+            statusColor = newStatusColor;
+            statusIcon = statusIcon;
+
+            pm25Value = '${predictedPM25.toStringAsFixed(1)} µg/m³';
+            pm10Value = '${predictedPM10.toStringAsFixed(1)} µg/m³';
+            vocValue = '${predictedVOC.toStringAsFixed(1)} ppm';
+          });
         }
       }
     } catch (e) {

@@ -64,10 +64,12 @@ flutter:
    - assets/mainlogo.png  
    - assets/mainlogo_mirrored.png
    - assets/lstm_model.tflite
+   - assets/lstm_model_day.tflite
    - assets/sensor_readings_120.csv
+   - assets/sensor_readings_varday.csv
    - assets/sensor_readings.csv
    - assets/scaler_config.json
-
+   - assets/sensor_readings_scaled_for_flutter.csv
 
   fonts:
     - family: Oswald

@@ -56,7 +56,7 @@ class CSVLoader {
 
   Future<List<SensorReading>> loadAndPrepareBuffer() async {
     final rawData = await rootBundle.loadString(
-      'assets/sensor_readings_120.csv',
+      'assets/sensor_readings_scaled_for_flutter.csv',
     );
     final lines = const LineSplitter().convert(rawData).skip(1); // skip header
 
@@ -139,7 +139,7 @@ class CSVLoader {
 
   Future<List<SensorReading>> loadFullBuffer() async {
     final rawData = await rootBundle.loadString(
-      'assets/sensor_readings_120.csv',
+      'assets/sensor_readings_scaled_for_flutter.csv',
     );
     final lines = const LineSplitter().convert(rawData).skip(1); // Skip header
 
